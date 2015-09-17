@@ -351,7 +351,7 @@ scale_freq_capacity(struct cpufreq_policy *policy, struct cpufreq_freqs *freqs)
 {
 	unsigned long cur = freqs ? freqs->new : policy->cur;
 	unsigned long scale = (cur << SCHED_CAPACITY_SHIFT) / policy->max;
-	struct cpufreq_cpuinfo *cpuinfo = &policy->cpuinfo;
+	struct cpufreq_cpuinfo *cpuinfo = &policy->cpuinfo;t
 	int cpu;
 
 	pr_debug("cpus %*pbl cur/cur max freq %lu/%u kHz freq scale %lu\n",
