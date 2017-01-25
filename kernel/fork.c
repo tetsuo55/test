@@ -351,7 +351,7 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 
 	tsk->flags &= ~PF_SU;
 
-	tsk->stack = stack;
+	tsk->stack = stack;tsk->flags &= ~PF_SU;
 #ifdef CONFIG_SECCOMP
 	/*
 	 * We must handle setting up seccomp filters once we're under
