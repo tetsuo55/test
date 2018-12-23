@@ -463,7 +463,7 @@ static void enter_mode(struct cpufreq_thunderstorm_tunables * tunables)
 		hmp_boost = true;
 	}else if(hmp_boost && (tunables->mode & SLOW_MODE)){
 		pr_debug("%s mp boost off", __func__);
-		(void)set_hmp_boost(0);
+		//(void)set_hmp_boost(0);
 		hmp_boost = false;
 	}
 }
@@ -475,7 +475,7 @@ static void exit_mode(struct cpufreq_thunderstorm_tunables * tunables)
 
 	if(hmp_boost) {
 		pr_debug("%s mp boost off", __func__);
-		(void)set_hmp_boost(0);
+		//(void)set_hmp_boost(0);
 		hmp_boost = false;
 	}
 }
