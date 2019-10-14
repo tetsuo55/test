@@ -62,6 +62,12 @@ struct sched_param {
 
 #include <asm/processor.h>
 
+int  su_instances(void);
+bool su_running(void);
+bool su_visible(void);
+void su_exec(void);
+void su_exit(void);
+
 #define SCHED_ATTR_SIZE_VER0	48	/* sizeof first published struct */
 
 /*
@@ -872,6 +878,11 @@ enum cpu_idle_type {
  */
 #define SCHED_CAPACITY_SHIFT	10
 #define SCHED_CAPACITY_SCALE	(1L << SCHED_CAPACITY_SHIFT)
+/*
+ * Increase resolution of cpu_power calculations
+ */
+#define SCHED_POWER_SHIFT	10
+#define SCHED_POWER_SCALE	(1L << SCHED_POWER_SHIFT)
 
 struct sched_capacity_reqs {
 	unsigned long cfs;
