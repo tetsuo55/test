@@ -182,6 +182,12 @@ extern void get_iowait_load(unsigned long *nr_waiters, unsigned long *load);
 #ifdef CONFIG_CPU_QUIET
 extern u64 nr_running_integral(unsigned int cpu);
 #endif
+#ifdef CONFIG_SCHED_HMP
+extern unsigned long nr_running_cpu(unsigned int cpu);
+extern int register_hmp_task_migration_notifier(struct notifier_block *nb);
+#define HMP_UP_MIGRATION       0
+#define HMP_DOWN_MIGRATION     1
+#endif
 
 extern void calc_global_load(unsigned long ticks);
 
@@ -753,6 +759,16 @@ struct signal_struct {
 
 #define SIGNAL_UNKILLABLE	0x00000040 /* for init: ignore fatal signals */
 
+#define SIGNAL_STOP_MASK (SIGNAL_CLD_MASK | SIGNAL_STOP_STOPPED | \
+			  SIGNAL_STOP_CONTINUED)
+
+static inline void signal_set_stop_flags(struct signal_struct *sig,
+					 unsigned int flags)
+{
+	WARN_ON(sig->flags & (SIGNAL_GROUP_EXIT|SIGNAL_GROUP_COREDUMP));
+	sig->flags = (sig->flags & ~SIGNAL_STOP_MASK) | flags;
+}
+
 /* If true, all threads except ->group_exit_task have pending SIGKILL */
 static inline int signal_group_exit(const struct signal_struct *sig)
 {
@@ -782,6 +798,8 @@ struct user_struct {
 	unsigned long mq_bytes;	/* How many bytes can be allocated to mqueue? */
 #endif
 	unsigned long locked_shm; /* How many pages of mlocked shm ? */
+	unsigned long unix_inflight;	/* How many files in flight in unix sockets */
+	atomic_long_t pipe_bufs;  /* how many pages are allocated in pipe buffers */
 
 #ifdef CONFIG_KEYS
 	struct key *uid_keyring;	/* UID specific keyring */
@@ -910,6 +928,7 @@ struct sched_capacity_reqs {
 #define SD_PREFER_SIBLING	0x1000	/* Prefer to place tasks in a sibling domain */
 #define SD_OVERLAP		0x2000	/* sched_domains of this level overlap */
 #define SD_NUMA			0x4000	/* cross-node balancing */
+#define SD_NO_LOAD_BALANCE	0x8000	/* flag for hmp scheduler */
 #define SD_SHARE_CAP_STATES	0x8000  /* Domain members share capacity state */
 
 #ifdef CONFIG_SCHED_SMT
@@ -1093,6 +1112,24 @@ extern void wake_up_if_idle(int cpu);
 # define SD_INIT_NAME(type)
 #endif
 
+#ifdef CONFIG_SCHED_HMP
+struct hmp_domain {
+	struct cpumask cpus;
+	struct cpumask possible_cpus;
+	struct list_head hmp_domains;
+};
+
+extern int set_hmp_boost(int enable);
+extern int set_hmp_semiboost(int enable);
+extern int set_hmp_boostpulse(int duration);
+extern int get_hmp_boost(void);
+extern int get_hmp_semiboost(void);
+extern int set_hmp_up_threshold(int value);
+extern int set_hmp_down_threshold(int value);
+extern int set_active_down_migration(int enable);
+extern int set_hmp_aggressive_up_migration(int enable);
+extern int set_hmp_aggressive_yield(int enable);
+#endif /* CONFIG_SCHED_HMP */
 #else /* CONFIG_SMP */
 
 struct sched_domain_attr;
@@ -1148,6 +1185,13 @@ struct sched_avg {
 	u64 last_update_time, load_sum;
 	u32 util_sum, period_contrib;
 	unsigned long load_avg, util_avg;
+#ifdef CONFIG_SCHED_HMP
+	u64 hmp_last_up_migration;
+	u64 hmp_last_down_migration;
+#ifdef CONFIG_HP_EVENT_HMP_SYSTEM_LOAD
+	bool is_big_thread;
+#endif
+#endif
 };
 
 #ifdef CONFIG_SCHEDSTATS
@@ -1474,6 +1518,15 @@ struct task_struct {
 	struct list_head thread_group;
 	struct list_head thread_node;
 
+#ifdef CONFIG_HP_EVENT_THREAD_GROUP
+	unsigned long thread_group_load;
+	int nr_thread_group;
+	raw_spinlock_t thread_group_lock;
+	bool hp_boost_requested;	/* This task requested hotplug boost */
+	bool applied_to_group_load;
+	bool member_of_group;
+	unsigned long group_applied_load;
+#endif
 	struct completion *vfork_done;		/* for vfork() */
 	int __user *set_child_tid;		/* CLONE_CHILD_SETTID */
 	int __user *clear_child_tid;		/* CLONE_CHILD_CLEARTID */
@@ -1785,6 +1838,9 @@ struct task_struct {
 	unsigned int	sequential_io;
 	unsigned int	sequential_io_avg;
 #endif
+#ifdef CONFIG_SDP
+	unsigned int sensitive;
+#endif
 };
 
 /* Future-safe accessor for struct task_struct's cpus_allowed. */
@@ -2047,6 +2103,7 @@ extern int task_free_unregister(struct notifier_block *n);
 #define PF_KTHREAD	0x00200000	/* I am a kernel thread */
 #define PF_RANDOMIZE	0x00400000	/* randomize virtual address space */
 #define PF_SWAPWRITE	0x00800000	/* Allowed to write to swap */
+#define PF_PERF_CRITICAL 0x01000000	/* Thread is performance-critical */
 #define PF_NO_SETAFFINITY 0x04000000	/* Userland is not allowed to meddle with cpus_allowed */
 #define PF_MCE_EARLY    0x08000000      /* Early kill for mce process policy */
 #define PF_MUTEX_TESTER	0x20000000	/* Thread belongs to the rt mutex tester */
@@ -2208,6 +2265,13 @@ void calc_load_exit_idle(void);
 static inline void calc_load_enter_idle(void) { }
 static inline void calc_load_exit_idle(void) { }
 #endif /* CONFIG_NO_HZ_COMMON */
+
+#ifndef CONFIG_CPUMASK_OFFSTACK
+static inline int set_cpus_allowed(struct task_struct *p, cpumask_t new_mask)
+{
+	return set_cpus_allowed_ptr(p, &new_mask);
+}
+#endif
 
 /*
  * Do not use outside of architecture code which knows its limitations.
@@ -2536,6 +2600,11 @@ static inline void mmdrop(struct mm_struct * mm)
 
 /* mmput gets rid of the mappings and all user-space */
 extern void mmput(struct mm_struct *);
+/* same as above but performs the slow path from the async kontext. Can
+ * be called from the atomic context as well
+ */
+extern void mmput_async(struct mm_struct *);
+
 /* Grab a reference to a task's mm, if it is not already going away */
 extern struct mm_struct *get_task_mm(struct task_struct *task);
 /*
@@ -3101,6 +3170,11 @@ static inline void inc_syscw(struct task_struct *tsk)
 {
 	tsk->ioac.syscw++;
 }
+
+static inline void inc_syscfs(struct task_struct *tsk)
+{
+	tsk->ioac.syscfs++;
+}
 #else
 static inline void add_rchar(struct task_struct *tsk, ssize_t amt)
 {
@@ -3115,6 +3189,9 @@ static inline void inc_syscr(struct task_struct *tsk)
 }
 
 static inline void inc_syscw(struct task_struct *tsk)
+{
+}
+static inline void inc_syscfs(struct task_struct *tsk)
 {
 }
 #endif
@@ -3153,4 +3230,30 @@ static inline unsigned long rlimit_max(unsigned int limit)
 	return task_rlimit_max(current, limit);
 }
 
+#if defined(CONFIG_HP_EVENT_THREAD_GROUP) || defined(CONFIG_HP_EVENT_HMP_SYSTEM_LOAD)
+void hp_event_enqueue_entity(struct sched_entity *se, int flags);
+void hp_event_dequeue_entity(struct sched_entity *se, int flags);
+void hp_event_update_entity_load(struct sched_entity *se);
+void hp_event_switched_from(struct sched_entity *se);
+void hp_event_do_exit(struct task_struct *p);
+void hp_event_update_rq_load(int cpu);
+extern unsigned int *pcpu_efficiency;
+#else
+static inline void hp_event_update_entity_load(struct sched_entity *se) { };
+static inline void hp_event_enqueue_entity(struct sched_entity *se, int flags) { };
+static inline void hp_event_dequeue_entity(struct sched_entity *se, int flags) { };
+static inline void hp_event_switched_from(struct sched_entity *se) { };
+static inline void hp_event_do_exit(struct task_struct *p) { };
+static inline void hp_event_update_rq_load(int cpu) { };
+#endif
+
+#if defined(CONFIG_HP_EVENT_HMP_SYSTEM_LOAD)
+extern int hp_sysload_to_quad_ratio;
+extern int hp_sysload_to_dual_ratio;
+extern int hp_sysload_param_calc(void);
+extern int hp_little_multiplier_ratio;
+#endif
+
+extern void save_pcpu_tick(int cpu);
+extern void restore_pcpu_tick(int cpu);
 #endif
