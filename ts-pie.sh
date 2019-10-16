@@ -95,11 +95,10 @@ FUNC_BUILD_KERNEL()
 
 	#FUNC_CLEAN_DTB
 
-	make -j$BUILD_JOB_NUMBER ARCH=$ARCH \
-			CROSS_COMPILE=$BUILD_CROSS_COMPILE \
+	time make -j$BUILD_JOB_NUMBER ARCH=$ARCH \
 			tmp_defconfig || exit -1
-	make -j$BUILD_JOB_NUMBER ARCH=$ARCH \
-			CROSS_COMPILE=$BUILD_CROSS_COMPILE || exit -1
+	time make -j$BUILD_JOB_NUMBER ARCH=$ARCH \
+			 || exit -1
 	echo ""
 
 	rm -f $RDIR/arch/$ARCH/configs/tmp_defconfig

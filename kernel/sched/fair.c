@@ -2814,7 +2814,20 @@ static void check_spread(struct cfs_rq *cfs_rq, struct sched_entity *se)
 		schedstat_inc(cfs_rq, nr_spread_over);
 #endif
 }
+/* Archpower added */
+static unsigned int Lgentle_fair_sleepers = 0;	// 1-on, 0 - off
+static unsigned int Larch_power = 0;		// 1-on, 0 - off
 
+void relay_gfs(unsigned int gfs)
+{
+	Lgentle_fair_sleepers = gfs;
+}
+
+void relay_ap(unsigned int ap)
+{
+	Larch_power = ap;
+}
+/* end */
 static void
 place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 {
