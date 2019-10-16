@@ -447,8 +447,8 @@ extern uint32 sec_save_softap_info(void);
 	!defined(DHD_LB_IRQSET)
 extern int argos_task_affinity_setup_label(struct task_struct *p, const char *label,
 	struct cpumask * affinity_cpu_mask, struct cpumask * default_cpu_mask);
-extern struct cpumask hmp_slow_cpu_mask;
-extern struct cpumask hmp_fast_cpu_mask;
+extern struct cpumask cpu_coregroup_mask(0);
+extern struct cpumask cpu_coregroup_mask(4);
 extern void set_irq_cpucore(unsigned int irq, cpumask_var_t default_cpu_mask,
 	cpumask_var_t affinity_cpu_mask);
 #endif /* ARGOS_CPU_SCHEDULER && CONFIG_SCHED_HMP && !DHD_LB_IRQSET */
@@ -6498,7 +6498,7 @@ dhd_dpc_thread(void *data)
 			free_cpumask_var(dhd->pub.default_cpu_mask);
 			dhd->pub.affinity_isdpc = FALSE;
 		} else {
-			cpumask_copy(dhd->pub.default_cpu_mask, &hmp_slow_cpu_mask);
+			cpumask_copy(dhd->pub.default_cpu_mask, cpu_coregroup_mask(0));
 			cpumask_or(dhd->pub.dpc_affinity_cpu_mask,
 				dhd->pub.dpc_affinity_cpu_mask, cpumask_of(DPC_CPUCORE));
 
@@ -9437,7 +9437,7 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 				irq = adapter->irq_num;
 #endif /* BCMSDIO */
 
-				cpumask_copy(dhd->pub.default_cpu_mask, &hmp_slow_cpu_mask);
+				cpumask_copy(dhd->pub.default_cpu_mask, cpu_coregroup_mask(0));
 				cpumask_or(dhd->pub.dpc_affinity_cpu_mask,
 					dhd->pub.dpc_affinity_cpu_mask,
 					cpumask_of(TASKLET_CPUCORE));

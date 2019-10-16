@@ -196,8 +196,8 @@ hrtimer_check_target(struct hrtimer *timer, struct hrtimer_clock_base *new_base)
  */
 
 #ifdef CONFIG_SCHED_HMP
-extern struct cpumask hmp_fast_cpu_mask;
-extern struct cpumask hmp_slow_cpu_mask;
+extern struct cpumask cpu_coregroup_mask(4);
+extern struct cpumask cpu_coregroup_mask(0);
 #endif
 
 static inline struct hrtimer_clock_base *
@@ -213,7 +213,7 @@ switch_hrtimer_base(struct hrtimer *timer, struct hrtimer_clock_base *base,
 #ifdef CONFIG_SCHED_HMP
 	/* Switch the timer base to boot cluster on HMP */
 	if (timer->bounded_to_boot_cluster &&
-		cpumask_test_cpu(this_cpu, &hmp_fast_cpu_mask) &&
+		cpumask_test_cpu(this_cpu, cpu_coregroup_mask(4)) &&
 		!pinned && get_sysctl_timer_migration()) {
 		int bound_cpu = 0;
 
@@ -222,7 +222,7 @@ switch_hrtimer_base(struct hrtimer *timer, struct hrtimer_clock_base *base,
 
 		/* Use the nearest busy cpu to switch timer base
 		 * from an idle cpu. */
-		for_each_cpu(cpu, &hmp_slow_cpu_mask) {
+		for_each_cpu(cpu, cpu_coregroup_mask(0)) {
 			if (!idle_cpu(cpu)) {
 				bound_cpu = cpu;
 				break;

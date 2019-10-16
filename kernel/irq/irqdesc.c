@@ -26,14 +26,14 @@
 static struct lock_class_key irq_desc_lock_class;
 
 #ifdef CONFIG_SCHED_HMP
-extern struct cpumask hmp_slow_cpu_mask;
+extern struct cpumask cpu_coregroup_mask(0);
 #endif
 #if defined(CONFIG_SMP)
 static void __init init_irq_default_affinity(void)
 {
 	alloc_cpumask_var(&irq_default_affinity, GFP_NOWAIT);
 #ifdef CONFIG_SCHED_HMP
-	cpumask_copy(irq_default_affinity, &hmp_slow_cpu_mask);
+	cpumask_copy(irq_default_affinity, cpu_coregroup_mask(0));
 #else
 	cpumask_setall(irq_default_affinity);
 #endif
