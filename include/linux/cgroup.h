@@ -934,6 +934,10 @@ static inline int cgroup_attach_task_all(struct task_struct *from,
 	return 0;
 }
 
+static inline int subsys_cgroup_allow_attach(void *tset)
+{
+	return -EINVAL;
+}
 #endif /* !CONFIG_CGROUPS */
 
 #endif /* _LINUX_CGROUP_H */
